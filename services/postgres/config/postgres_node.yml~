@@ -1,0 +1,17 @@
+---
+local_db: sqlite3:/var/vcap/services/postgres/postgres_node.db
+base_dir: /var/vcap/services/postgres/
+ip_route: 50.56.89.109
+mbus: nats://50.56.87.111:4222
+log_level: DEBUG
+pid: /var/vcap/sys/run/postgres_node.pid
+available_storage: 1024
+node_id: postgres_node_1
+max_db_size: 20
+max_long_query: 3
+postgres:
+  host: 50.56.89.109
+  port: 5432
+  user: postgres
+  pass: postgres
+
