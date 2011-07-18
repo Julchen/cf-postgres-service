@@ -8,15 +8,15 @@ require "bundler/setup"
 
 $LOAD_PATH.unshift(File.expand_path("../../lib", __FILE__))
 
-require "postgres_service/util"
-require "postgres_service/node"
+require "postgresql_service/util"
+require "postgresql_service/node"
 
 include VCAP::Services::Postgres::Util
 
-config_file = File.expand_path("../../config/postgres_node.yml", __FILE__)
+config_file = File.expand_path("../../config/postgresql_node.yml", __FILE__)
 
 OptionParser.new do |opts|
-  opts.banner = "Usage: postgres_node [options]"
+  opts.banner = "Usage: postgresql_node [options]"
   opts.on("-c", "--config [ARG]", "Configuration File") do |opt|
     config_file = opt
   end

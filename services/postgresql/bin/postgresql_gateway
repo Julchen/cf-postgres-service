@@ -22,10 +22,10 @@ require 'common/util'
 require 'postgres_service/provisioner'
 require 'vcap/common'
 
-config_file = File.expand_path("../../config/postgres_gateway.yml", __FILE__)
+config_file = File.expand_path("../../config/postgresql_gateway.yml", __FILE__)
 
 OptionParser.new do |opts|
-  opts.banner = "Usage: postgres_gateway [options]"
+  opts.banner = "Usage: postgresql_gateway [options]"
 
   opts.on("-c", "--config [ARG]", "Configuration File") do |opt|
     config_file = opt

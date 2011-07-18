@@ -4,12 +4,12 @@ require "thread"
 
 module VCAP
   module Services
-    module Postgres
+    module Postgresql
     end
   end
 end
 
-class VCAP::Services::Postgres::Barrier
+class VCAP::Services::Postgresql::Barrier
 
   def initialize(options = {}, &callback)
     raise ArgumentError unless options[:timeout] || options[:callbacks]

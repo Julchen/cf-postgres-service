@@ -13,16 +13,16 @@ require "uuidtools"
 require "vcap/common"
 require "vcap/component"
 
-require "postgres_service/barrier"
+require "postgresql_service/barrier"
 
 module VCAP
   module Services
-    module Postgres
+    module Postgresql
     end
   end
 end
 
-class VCAP::Services::Postgres::Provisioner
+class VCAP::Services::Postgresql::Provisioner
 
   def initialize(opts)
     @logger    = opts[:logger]
@@ -37,11 +37,11 @@ class VCAP::Services::Postgres::Provisioner
   end
 
   def start
-    @logger.info("Starting Postgres-Service Provisioner..")
+    @logger.info("Starting Postgresql-Service Provisioner..")
     @service_nats = NATS.connect(:uri => @svc_mbus) {on_service_connect}
     @postgres_nats = NATS.connect(:uri => @postgres_mbus) {on_node_connect}
     VCAP::Component.register(:nats => @service_nats,
-                            :type => 'Postgres-Service',
+                            :type => 'Postgresql-Service',
                             :host => @local_ip,
                             :config => @opts)
     EM.add_periodic_timer(60) {process_nodes}
@@ -93,7 +93,7 @@ class VCAP::Services::Postgres::Provisioner
   end
 
   def on_node_announce(msg)
-    @logger.debug("[Postgres] Received Postgres Node announcement: #{msg}")
+    @logger.debug("[Postgres] Received Postgresql Node announcement: #{msg}")
     announce_message = Yajl::Parser.parse(msg)
     @nodes[announce_message["id"]] = Time.now.to_i
   end
@@ -101,7 +101,7 @@ class VCAP::Services::Postgres::Provisioner
   def unprovision_service(instance_id, &blk)
     begin
       success = true
-      @logger.debug("Unprovisioning Postgres instance #{instance_id}")
+      @logger.debug("Unprovisioning Postgresql instance #{instance_id}")
       request = {'name' => instance_id}
       @mysql_nats.publish("PgaaS.unprovision", Yajl::Encoder.encode(request))
       @prov_svcs.delete(instance_id)
@@ -113,10 +113,10 @@ class VCAP::Services::Postgres::Provisioner
   end
 
   def provision_service(version, plan, &blk)
-    @logger.debug("Attempting to provision Postgres instance (version=#{version}, plan=#{plan})")
+    @logger.debug("Attempting to provision Postgresql instance (version=#{version}, plan=#{plan})")
     subscription = nil
     barrier = VCAP::Services::Postgres::Barrier.new(:timeout => @node_timeout, :callbacks => @nodes.length) do |responses|
-      @logger.debug("[Postgres] Found the following Postgres Nodes: #{responses.pretty_inspect}")
+      @logger.debug("[Postgresql] Found the following Postgresql Nodes: #{responses.pretty_inspect}")
       @postgres_nats.unsubscribe(subscription)
       unless responses.empty?
         provision_node(version, plan, responses, blk)
@@ -128,7 +128,7 @@ class VCAP::Services::Postgres::Provisioner
   end
 
   def provision_node(version, plan, postgres_nodes, blk)
-    @logger.debug("Provisioning Postgres node (version=#{version}, plan=#{plan}, nnodes=#{postgres_nodes.length})")
+    @logger.debug("Provisioning Postgresql node (version=#{version}, plan=#{plan}, nnodes=#{postgresql_nodes.length})")
     node_with_most_storage = nil
     most_storage = 0
 
@@ -175,7 +175,7 @@ class VCAP::Services::Postgres::Provisioner
         :configuration => svc,
         :credentials   => svc[:data],
       }
-      @logger.debug("Binding Postgres instance #{instance_id} to handle #{handle[:service_id]}")
+      @logger.debug("Binding Postgresql instance #{instance_id} to handle #{handle[:service_id]}")
     end
     blk.call(handle)
   end

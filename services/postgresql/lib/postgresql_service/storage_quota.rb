@@ -1,9 +1,9 @@
 # Copyright (c) 2009-2011 VMware, Inc.
 require "pg"
 
-module VCAP; module Services; module Postgres; end; end; end
+module VCAP; module Services; module Postgresql; end; end; end
 
-class VCAP::Services::Postgres::Node
+class VCAP::Services::Postgresql::Node
 
   DATA_LENGTH_FIELD = 6
 
@@ -78,7 +78,7 @@ class VCAP::Services::Postgres::Node
       end
     end
     rescue Postgres::Error => e
-      @logger.warn("Postgres exception: [#{e.errno}] #{e.error}\n" +
+      @logger.warn("Postgresql exception: [#{e.errno}] #{e.error}\n" +
                    e.backtrace.join("\n"))
   end
 

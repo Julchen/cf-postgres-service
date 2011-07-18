@@ -15,17 +15,17 @@ require 'vcap/component'
 
 $:.unshift(File.dirname(__FILE__))
 
-require "postgres_service/util"
+require "postgresql_service/util"
 
-module VCAP; module Services; module Postgres; end; end; end
+module VCAP; module Services; module Postgresql; end; end; end
 
-class VCAP::Services::Postgres::Node
+class VCAP::Services::Postgresql::Node
 
   KEEP_ALIVE_INTERVAL = 15
   LONG_QUERY_INTERVAL = 1
   STORAGE_QUOTA_INTERVAL = 1
 
-  include VCAP::Services::Postgres::Util
+  include VCAP::Services::Postgresql::Util
 
   class ProvisionedService
     include DataMapper::Resource
