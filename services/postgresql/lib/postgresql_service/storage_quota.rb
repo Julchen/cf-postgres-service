@@ -8,53 +8,36 @@ class VCAP::Services::Postgresql::Node
   DATA_LENGTH_FIELD = 6
 
   def db_size(db)
-    table_status = @connection.query('show table status from ' + db)
-    sum = 0
-    table_status.each do |x|
-      sum += x[DATA_LENGTH_FIELD].to_i
-    end
-    sum
+    res = connection.exec("SELECT pg_database_size('#{db}')");
+    sum = res.getvalue(0,0) 
+    rescue PGError => e
+      @logger.warn("Postgresql exception: [#{e.err}] #{e.errstr}\n")	   
   end
 
   def kill_user_sessions(target_user, target_db)
-      process_list = @connection.list_processes
-      process_list.each do |proc|
-        thread_id, user, _, db = proc
-        if (user == target_user) and (db == target_db) then
-          @connection.query('KILL CONNECTION ' + thread_id)
-        end
-      end
-  end
-
-  def access_disabled?(db)
-    rights = @connection.query("SELECT insert_priv, create_priv, update_priv
-                                FROM db WHERE Db=" +  "'#{db}'")
-    rights.each do |right|
-      if right.include? 'Y' then
-        return false
-      end
-    end
-    true
+     @connection.exec("SELECT pg_terminate_backend(procpid) 
+                       FROM pg_stat_activity 
+                       WHERE usename = '#{target_user}' AND 
+                             datname = '#{target_db}'");      
   end
 
   def grant_write_access(db, service)
-    @logger.warn("DB permissions inconsistent....") unless access_disabled?(db)
-    @connection.query("UPDATE db SET insert_priv='Y', create_priv='Y',
-                       update_priv='Y' WHERE Db=" +  "'#{db}'")
-    @connection.query("FLUSH PRIVILEGES")
+    user = service.user
+    @connection.exec("GRANT ALL PRIVILEGES ON database '#{db}' to '#{user}'")
     service.quota_exceeded = false
     service.save
+    rescue PGError => e
+      @logger.warn("Postgresql exception: [#{e.err}] #{e.errstr}\n")
   end
 
   def revoke_write_access(db, service)
     user = service.user
-    @logger.warn("DB permissions inconsistent....") if access_disabled?(db)
-    @connection.query("UPDATE db SET insert_priv='N', create_priv='N',
-                       update_priv='N' WHERE Db=" +  "'#{db}'")
-    @connection.query("FLUSH PRIVILEGES")
+    @connection.exec("REVOKE INSERT, UPDATE, CREATE ON '#{db}' TO '#{user}'")
     kill_user_sessions(user, db)
     service.quota_exceeded = true
     service.save
+    rescue PGError => e
+      @logger.warn("Postgresql exception: [#{e.err}] #{e.errstr}\n")
   end
 
   def fmt_db_listing(user, db, size)
@@ -77,8 +60,8 @@ class VCAP::Services::Postgresql::Node
                      " -- access restored")
       end
     end
-    rescue Postgres::Error => e
-      @logger.warn("Postgresql exception: [#{e.errno}] #{e.error}\n" +
+    rescue PGError => e
+      @logger.warn("Postgresql exception: [#{e.err}] #{e.errstr}\n" +
                    e.backtrace.join("\n"))
   end
 

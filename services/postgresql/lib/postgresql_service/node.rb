@@ -38,7 +38,7 @@ class VCAP::Services::Postgresql::Node
 
   def initialize(options)
     @logger = options[:logger]
-    @logger.info("Starting Postgres-Service-Node..")
+    @logger.info("Starting Postgresql-Service-Node..")
 
     @local_ip = VCAP.local_ip(options[:ip_route])
 
@@ -50,9 +50,10 @@ class VCAP::Services::Postgresql::Node
 
     @connection = postgres_connect
 
-#    EM.add_periodic_timer(KEEP_ALIVE_INTERVAL) {postgres_keep_alive}
-#    EM.add_periodic_timer(LONG_QUERY_INTERVAL) {kill_long_queries}
- #   EM.add_periodic_timer(STORAGE_QUOTA_INTERVAL) {enforce_storage_quota}
+    EM.add_periodic_timer(KEEP_ALIVE_INTERVAL) {postgres_keep_alive}
+    EM.add_periodic_timer(STORAGE_QUOTA_INTERVAL) {enforce_storage_quota}
+
+    set_statment_timeout()
 
     @base_dir = options[:base_dir]
     FileUtils.mkdir_p(@base_dir) if @base_dir
@@ -60,7 +61,7 @@ class VCAP::Services::Postgresql::Node
     DataMapper.setup(:default, options[:local_db])
     DataMapper::auto_upgrade!
 
-    #check_db_consistency()
+    check_db_consistency()
 
     @available_storage = options[:available_storage] * 1024 * 1024
     ProvisionedService.all.each do |provisioned_service|
@@ -72,7 +73,7 @@ class VCAP::Services::Postgresql::Node
     @nats = NATS.connect(:uri => options[:mbus]) {on_connect}
 
     VCAP::Component.register(:nats => @nats,
-                            :type => 'Postgres-Service-Node',
+                            :type => 'Postgresql-Service-Node',
                             :host => @local_ip,
                             :config => options)
 
@@ -80,7 +81,7 @@ class VCAP::Services::Postgresql::Node
 
   def check_db_consistency()
     db_list = []
-    @connection.query('select db, user from db').each{|db, user| db_list.push([db, user])}
+    res  = @connection.exec('select db, user from db').each{|rslt| db_list.push([rslt['db'], rslt['user']])}    
     ProvisionedService.all.each do |service|
       db, user = service.name, service.user
       if not db_list.include?([db, user]) then
@@ -105,36 +106,34 @@ class VCAP::Services::Postgresql::Node
       begin
         return PGconn.connect(host, port.to_i, '', '', 'postgres', user, password)
       rescue PGError => e
-        @logger.info("Postgres connection attempt failed: #{e.error}")
+        @logger.info("Postgresql connection attempt failed: [#{e.err}] #{e.errstr}")
         sleep(5)
       end
     end
 
-    @logger.fatal("Postgres connection unrecoverable")
+    @logger.fatal("Postgresql connection unrecoverable")
     shutdown
     exit
   end
 
   #keep connection alive, and check db liveness
   def postgres_keep_alive
-    @connection.ping()
-  rescue Postgres::Error => e
-    @logger.info("Postgres connection lost: [#{e.errno}] #{e.error}")
+    stat = @connection.status()
+  rescue PGError => e
+    @logger.info("Postgresql connection lost: [#{e.err}] #{e.errstr}")
+    @connection = postgres_connect
+  if (stat = PGconn.CONNECTION_BAD) then
+    @logger.info("Postgresql connection lost. Reconnect.")
     @connection = postgres_connect
   end
-
-  def kill_long_queries
-    process_list = @connection.list_processes
-    process_list.each do |proc|
-      thread_id, user, _, db, command, time, _, info = proc
-      if (time.to_i >= @max_long_query) and (command == 'Query') and (user != 'root') then
-        @connection.query("KILL QUERY " + thread_id)
-        @logger.info("Killed long query: user:#{user} db:#{db} time:#{time} info:#{info}")
-      end
-    end
-  rescue Postgres::Error => e
-    @logger.info("Postgres error: [#{e.errno}] #{e.error}")
   end
+
+  #kill long queries
+  def set_statment_timeout
+    res = @connection.exec("SET statement_timeout TO '#{@max_long_query}min'") 
+    rescue PGError => e
+      @logger.info("Postgresql error: [#{e.err}] #{e.errstr}")
+  end 
 
   def shutdown
     @logger.info("Shutting down..")
@@ -191,8 +190,6 @@ class VCAP::Services::Postgresql::Node
 
     delete_database(provisioned_service)
 
-    # TODO: validate that database files are not lingering
-    # TODO: kill active sessions before removing database
     storage = storage_for_service(provisioned_service)
     @available_storage += storage
 
@@ -220,11 +217,9 @@ class VCAP::Services::Postgresql::Node
       @logger.info("Creating credentials: #{user}/#{password}")
       @connection.query("CREATE USER #{user} WITH PASSWORD '#{password}'")
       @connection.query("GRANT ALL PRIVILEGES ON database #{name} to #{user}")
-#      @connection.query("GRANT ALL PRIVILEGES ON database #{name} to #{user}@'%'")
- #     @connection.query("GRANT ALL PRIVILEGES ON database #{name} to #{user}@'localhost'")
-      #@connection.query("FLUSH PRIVILEGES")
-     # storage = storage_for_service(provisioned_service)
-     # @available_storage -= storage
+
+      storage = storage_for_service(provisioned_service)
+      @available_storage -= storage
       @logger.debug("Done creating #{provisioned_service.pretty_inspect}. Took #{Time.now - start}.")
     rescue => e
       @logger.warn("Could not create database: [] #{e.error}")
@@ -235,11 +230,14 @@ class VCAP::Services::Postgresql::Node
     name, user = [:name, :user].map { |field| provisioned_service.send(field) }
     begin
       @logger.info("Deleting database: #{name}")
+      @connection.exec("SELECT pg_terminate_backend(procpid) 
+                       FROM pg_stat_activity 
+                       WHERE datname = '#{target_db}' AND 
+                             procpid <> pg_backend_pid()");   
       @connection.query("DROP DATABASE #{name}")
-      @connection.query("DROP USER #{user}")
-      @connection.query("DROP USER #{user}@'localhost'")
-    rescue Postgres::Error => e
-      @logger.fatal("Could not delete database: [#{e.errno}] #{e.error}")
+      @connection.query("DROP USER #{user}")      
+    rescue PGError => e
+      @logger.fatal("Could not delete database: [#{e.err}] #{e.errstr}")
     end
   end
 
