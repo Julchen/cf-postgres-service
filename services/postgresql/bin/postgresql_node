@@ -11,7 +11,7 @@ $LOAD_PATH.unshift(File.expand_path("../../lib", __FILE__))
 require "postgresql_service/util"
 require "postgresql_service/node"
 
-include VCAP::Services::Postgres::Util
+include VCAP::Services::Postgresql::Util
 
 config_file = File.expand_path("../../config/postgresql_node.yml", __FILE__)
 
@@ -76,7 +76,7 @@ end
 File.open(pid_file, 'w') { |f| f.puts "#{Process.pid}" }
 
 EM.run do
-  node = VCAP::Services::Postgres::Node.new(options)
+  node = VCAP::Services::Postgresql::Node.new(options)
   trap("INT") {shutdown(node)}
   trap("TERM") {shutdown(node)}
 end

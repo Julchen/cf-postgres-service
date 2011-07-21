@@ -19,7 +19,7 @@ require 'yaml'
 
 require 'common/asynchronous_service_gateway'
 require 'common/util'
-require 'postgres_service/provisioner'
+require 'postgresql_service/provisioner'
 require 'vcap/common'
 
 config_file = File.expand_path("../../config/postgresql_gateway.yml", __FILE__)
@@ -67,7 +67,7 @@ config[:service][:url]   = "http://#{config[:host]}:#{config[:port]}"
 
 # Go!
 EM.run do
-  sp = VCAP::Services::Postgres::Provisioner.new(
+  sp = VCAP::Services::Postgresql::Provisioner.new(
     :logger   => logger,
     :version  => config[:service][:version],
     :local_ip => config[:host],
