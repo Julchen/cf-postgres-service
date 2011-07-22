@@ -8,8 +8,8 @@ class VCAP::Services::Postgresql::Node
   DATA_LENGTH_FIELD = 6
 
   def db_size(db)
-    res = connection.exec("SELECT pg_database_size('#{db}')");
-    sum = res.getvalue(0,0) 
+    res = @connection.exec("SELECT pg_database_size('#{db}')");
+    sum = res.getvalue(0,0).to_i 
     rescue PGError => e
       @logger.warn("Postgresql exception: [#{e.err}] #{e.errstr}\n")	   
   end
@@ -45,7 +45,7 @@ class VCAP::Services::Postgresql::Node
   end
 
   def enforce_storage_quota
-    @connection.select_db('postgres')
+    #@connection.select_db('postgres')
     ProvisionedService.all.each do |service|
       db, user, quota_exceeded = service.name, service.user, service.quota_exceeded
       size = db_size(db)

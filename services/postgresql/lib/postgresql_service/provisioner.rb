@@ -103,7 +103,7 @@ class VCAP::Services::Postgresql::Provisioner
       success = true
       @logger.debug("Unprovisioning Postgresql instance #{instance_id}")
       request = {'name' => instance_id}
-      @mysql_nats.publish("PgaaS.unprovision", Yajl::Encoder.encode(request))
+      @postgres_nats.publish("PgaaS.unprovision", Yajl::Encoder.encode(request))
       @prov_svcs.delete(instance_id)
     rescue => e
       @logger.warn(e)
@@ -115,7 +115,7 @@ class VCAP::Services::Postgresql::Provisioner
   def provision_service(version, plan, &blk)
     @logger.debug("Attempting to provision Postgresql instance (version=#{version}, plan=#{plan})")
     subscription = nil
-    barrier = VCAP::Services::Postgres::Barrier.new(:timeout => @node_timeout, :callbacks => @nodes.length) do |responses|
+    barrier = VCAP::Services::Postgresql::Barrier.new(:timeout => @node_timeout, :callbacks => @nodes.length) do |responses|
       @logger.debug("[Postgresql] Found the following Postgresql Nodes: #{responses.pretty_inspect}")
       @postgres_nats.unsubscribe(subscription)
       unless responses.empty?
@@ -128,17 +128,17 @@ class VCAP::Services::Postgresql::Provisioner
   end
 
   def provision_node(version, plan, postgres_nodes, blk)
-    @logger.debug("Provisioning Postgresql node (version=#{version}, plan=#{plan}, nnodes=#{postgresql_nodes.length})")
+    @logger.debug("Provisioning Postgresql node (version=#{version}, plan=#{plan}, nnodes=#{postgres_nodes.length})")
     node_with_most_storage = nil
     most_storage = 0
 
     postgres_nodes.each do |postgres_node_msg|
       postgres_node_msg = postgres_node_msg.first
       node = Yajl::Parser.parse(postgres_node_msg)
-#      if node["available_storage"] > most_storage
+      if node["available_storage"] > most_storage
         node_with_most_storage = node["id"]
- #       most_storage = node["available_storage"]
-  #    end
+        most_storage = node["available_storage"]
+      end
     end
 
     if node_with_most_storage

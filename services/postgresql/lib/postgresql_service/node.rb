@@ -16,6 +16,7 @@ require 'vcap/component'
 $:.unshift(File.dirname(__FILE__))
 
 require "postgresql_service/util"
+require "postgresql_service/storage_quota"
 
 module VCAP; module Services; module Postgresql; end; end; end
 
@@ -81,7 +82,7 @@ class VCAP::Services::Postgresql::Node
 
   def check_db_consistency()
     db_list = []
-    res  = @connection.exec('select db, user from db').each{|rslt| db_list.push([rslt['db'], rslt['user']])}    
+    @connection.exec('select d.datname as db, u.usename as user from pg_database d inner join pg_shadow u on d.datdba = u.usesysid ').each{|rslt| db_list.push([rslt['db'], rslt['user']])}    
     ProvisionedService.all.each do |service|
       db, user = service.name, service.user
       if not db_list.include?([db, user]) then
@@ -213,9 +214,9 @@ class VCAP::Services::Postgresql::Node
     begin
       start = Time.now
       @logger.debug("Creating: #{provisioned_service.pretty_inspect}")
-      @connection.query("CREATE DATABASE #{name}")
       @logger.info("Creating credentials: #{user}/#{password}")
       @connection.query("CREATE USER #{user} WITH PASSWORD '#{password}'")
+      @connection.query("CREATE DATABASE #{name} OWNER #{user}")
       @connection.query("GRANT ALL PRIVILEGES ON database #{name} to #{user}")
 
       storage = storage_for_service(provisioned_service)
@@ -232,7 +233,7 @@ class VCAP::Services::Postgresql::Node
       @logger.info("Deleting database: #{name}")
       @connection.exec("SELECT pg_terminate_backend(procpid) 
                        FROM pg_stat_activity 
-                       WHERE datname = '#{target_db}' AND 
+                       WHERE datname = '#{name}' AND 
                              procpid <> pg_backend_pid()");   
       @connection.query("DROP DATABASE #{name}")
       @connection.query("DROP USER #{user}")      
