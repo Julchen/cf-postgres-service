@@ -27,7 +27,7 @@ class VCAP::Services::Postgresql::Node
     service.quota_exceeded = false
     service.save
     rescue PGError => e
-      @logger.warn("Postgresql exception: [#{e.err}] #{e.errstr}\n")
+      @logger.warn("Postgresql exception: #{e}\n")
   end
 
   def revoke_write_access(db, service)
@@ -37,7 +37,7 @@ class VCAP::Services::Postgresql::Node
     service.quota_exceeded = true
     service.save
     rescue PGError => e
-      @logger.warn("Postgresql exception: [#{e.err}] #{e.errstr}\n")
+      @logger.warn("Postgresql exception: #{e}\n")
   end
 
   def fmt_db_listing(user, db, size)
@@ -61,7 +61,7 @@ class VCAP::Services::Postgresql::Node
       end
     end
     rescue PGError => e
-      @logger.warn("Postgresql exception: [#{e.err}] #{e.errstr}\n" +
+      @logger.warn("Postgresql exception: #{e}\n" +
                    e.backtrace.join("\n"))
   end
 

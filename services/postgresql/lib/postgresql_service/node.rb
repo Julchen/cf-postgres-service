@@ -107,7 +107,7 @@ class VCAP::Services::Postgresql::Node
       begin
         return PGconn.connect(host, port.to_i, '', '', 'postgres', user, password)
       rescue PGError => e
-        @logger.info("Postgresql connection attempt failed: [#{e.err}] #{e.errstr}")
+        @logger.info("Postgresql connection attempt failed: #{e}")
         sleep(5)
       end
     end
@@ -121,7 +121,7 @@ class VCAP::Services::Postgresql::Node
   def postgres_keep_alive
     stat = @connection.status()
   rescue PGError => e
-    @logger.info("Postgresql connection lost: [#{e.err}] #{e.errstr}")
+    @logger.info("Postgresql connection lost: #{e}")
     @connection = postgres_connect
   if (stat = PGconn.CONNECTION_BAD) then
     @logger.info("Postgresql connection lost. Reconnect.")
@@ -133,7 +133,7 @@ class VCAP::Services::Postgresql::Node
   def set_statment_timeout
     res = @connection.exec("SET statement_timeout TO '#{@max_long_query}min'") 
     rescue PGError => e
-      @logger.info("Postgresql error: [#{e.err}] #{e.errstr}")
+      @logger.info("Postgresql error: #{e}")
   end 
 
   def shutdown
@@ -218,7 +218,7 @@ class VCAP::Services::Postgresql::Node
       @connection.query("CREATE USER #{user} WITH PASSWORD '#{password}'")
       @connection.query("CREATE DATABASE #{name} OWNER #{user}")
       @connection.query("GRANT ALL PRIVILEGES ON database #{name} to #{user}")
-
+      @connection.query("REVOKE ALL PRIVILEGES ON database #{name} FROM PUBLIC")
       storage = storage_for_service(provisioned_service)
       @available_storage -= storage
       @logger.debug("Done creating #{provisioned_service.pretty_inspect}. Took #{Time.now - start}.")
@@ -238,7 +238,7 @@ class VCAP::Services::Postgresql::Node
       @connection.query("DROP DATABASE #{name}")
       @connection.query("DROP USER #{user}")      
     rescue PGError => e
-      @logger.fatal("Could not delete database: [#{e.err}] #{e.errstr}")
+      @logger.fatal("Could not delete database: #{e}")
     end
   end
 
